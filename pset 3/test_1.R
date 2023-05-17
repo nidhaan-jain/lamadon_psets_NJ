@@ -1,4 +1,6 @@
-DY1  = as.matrix(kronecker(Y1 ,rep(1,nk)))
+N = 10 
+nk = 3 
+DY1 = (kronecker(rep(1,N),diag(nk)))
 
  rw     = c(t(tau))
 

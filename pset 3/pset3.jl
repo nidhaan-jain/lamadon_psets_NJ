@@ -25,14 +25,15 @@ end
 # obtain the sum of the likelihood for a given k   
 function sum_exp(v)
     vm = maximum(v)
-    z = (exp.(v .- vm))
-    z = z[1] + z[2] + z[3]
-    z = log(z) + vm
+    z = (exp.(v .- vm)) # z is a vector that replaces the max. likelihood with zero 
+    z = z[1] + z[2] + z[3] # replaces z with a scalar containing the sum of the likelihoods 
+    z = log(z) + vm # the desired sum of the likelihoods
 end 
 
 # obtain the posterior for p_k 
 # this function will eventually take the following arguments- 
 # Y1 (vector of 1st period realisations), Y2, Y3, μ (matrix of k-specific means over time), σ (same as before, but sd), pk, n, k
+# τ returns the posteriors (prob. that a given individual, represented by a row, belongs to a given group, represented by a column)
 τ = zeros(n, k) # here, n is the number of individuals and k is the number of latent groups 
 lpm = zeros(n, k)
 lik = 0 
@@ -53,14 +54,15 @@ end
 DY1  = kron(Y1, ones(k))
 DY2  = kron(Y2, ones(k))
 DY3  = kron(Y3, ones(k))
-Dkj1 = kron(speye(N),sparse(1:k,1:k))
-Dkj2 = kron(speye(N),sparse(1:k,1:k))
-Dkj3 = kron(speye(N),sparse(1:k,1:k))
+Dkj1 = kron(ones(n), Diagonal(ones(k)))
+Dkj2 = kron(ones(n), Diagonal(ones(k)))
+Dkj3 = kron(ones(n), Diagonal(ones(k)))
 
-rw = τ'
+rw = reshape(τ,:) # reshape the matrix of posteriors into a vector
+model = glm(@formula(DY1 ~ X[1,:] + X[2,:]), DataFrame(X), Normal(), wts=weights)
 fit = wfit(lm, Dkj1, DY1, rw)
 A[1,:] = coef(fit)[1:nk]'
 
 
-
-   
+# weighted least squares fit of Dkj1 and DY1 using rw weights 
+weighted_fit = wfit(lm, Dkj1, DY1, rw)
