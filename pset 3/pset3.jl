@@ -59,10 +59,12 @@ Dkj2 = kron(ones(n), Diagonal(ones(k)))
 Dkj3 = kron(ones(n), Diagonal(ones(k)))
 
 rw = reshape(τ,:) # reshape the matrix of posteriors into a vector
-model = glm(@formula(DY1 ~ X[1,:] + X[2,:]), DataFrame(X), Normal(), wts=weights)
-fit = wfit(lm, Dkj1, DY1, rw)
-A[1,:] = coef(fit)[1:nk]'
+linear_fit = lm(Dkj1, DY1, wts = rw) # weighted least squares fit of Dkj1 and DY1 using rw weights
 
+# recover coefficients from the linear fit 
+β = coef(linear_fit)
+A[1,:] = β[1:k] # intercepts
 
-# weighted least squares fit of Dkj1 and DY1 using rw weights 
-weighted_fit = wfit(lm, Dkj1, DY1, rw)
+β_v = lm(Dkj1, residuals(linear_fit) .^ 2 / rw, rw)
+S[1,:] = sqrt.(coef(β_v)) # standard deviations
+
