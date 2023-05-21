@@ -12,6 +12,13 @@
 using LinearAlgebra
 using Distributions
 using GLM 
+using Random 
+
+
+########### set script parameters 
+Random.seed!(2324) # set seed for reproducibility
+n = 1000 # number of individuals 
+k = 3 # number of latent groups 
 
 ########### define intermediate functions 
 
@@ -30,41 +37,86 @@ function sum_exp(v)
     z = log(z) + vm # the desired sum of the likelihoods
 end 
 
-# obtain the posterior for p_k 
-# this function will eventually take the following arguments- 
-# Y1 (vector of 1st period realisations), Y2, Y3, μ (matrix of k-specific means over time), σ (same as before, but sd), pk, n, k
-# τ returns the posteriors (prob. that a given individual, represented by a row, belongs to a given group, represented by a column)
-τ = zeros(n, k) # here, n is the number of individuals and k is the number of latent groups 
-lpm = zeros(n, k)
-lik = 0 
-for i in 1:n 
-    ltau = log.(pk)
-    lnorm1 = pdf_value(Y1[i], μ[1, :], σ[1, :])
-    lnorm2 = pdf_value(Y2[i], μ[2, :], σ[2, :])
-    lnorm3 = pdf_value(Y3[i], μ[3, :], σ[3, :])
-    lall = ltau .+ lnorm1 .+ lnorm2 .+ lnorm3
-    lpm[i, :] = lall
-    lik = lik + sum_exp(lall)
-    τ[i, :] = exp.(lall .- sum_exp(lall))
-end 
+
+# write function to compute the parameters 
+function compute_parameters(Y1, Y2, Y3, μ, σ, pk, n, k, tol)
+
+error = 9999
+
+while error > tol 
 
 
-########### update the means and variances 
+    # obtain the posterior for p_k 
+    # this function will eventually take the following arguments- 
+    # Y1 (vector of 1st period realisations), Y2, Y3, μ (matrix of k-specific means over time), σ (same as before, but sd), pk, n, k
+    # τ returns the posteriors (prob. that a given individual, represented by a row, belongs to a given group, represented by a column)
+    τ = zeros(n, k) # here, n is the number of individuals and k is the number of latent groups 
+    lpm = zeros(n, k)
+    lik = 0 
+    for i in 1:n 
+        ltau = log.(pk)
+        lnorm1 = pdf_value(Y1[i], μ[1, :], σ[1, :])
+        lnorm2 = pdf_value(Y2[i], μ[2, :], σ[2, :])
+        lnorm3 = pdf_value(Y3[i], μ[3, :], σ[3, :])
+        lall = ltau .+ lnorm1 .+ lnorm2 .+ lnorm3
+        lpm[i, :] = lall
+        lik = lik + sum_exp(lall)
+        τ[i, :] = exp.(lall .- sum_exp(lall))
+    end 
 
-DY1  = kron(Y1, ones(k))
-DY2  = kron(Y2, ones(k))
-DY3  = kron(Y3, ones(k))
-Dkj1 = kron(ones(n), Diagonal(ones(k)))
-Dkj2 = kron(ones(n), Diagonal(ones(k)))
-Dkj3 = kron(ones(n), Diagonal(ones(k)))
 
-rw = reshape(τ,:) # reshape the matrix of posteriors into a vector
-linear_fit = lm(Dkj1, DY1, wts = rw) # weighted least squares fit of Dkj1 and DY1 using rw weights
+    ########### update the means and variances 
 
-# recover coefficients from the linear fit 
-β = coef(linear_fit)
-A[1,:] = β[1:k] # intercepts
+    DY1  = kron(Y1, ones(k))
+    DY2  = kron(Y2, ones(k))
+    DY3  = kron(Y3, ones(k))
+    Dkj1 = kron(ones(n), Diagonal(ones(k)))
+    Dkj2 = kron(ones(n), Diagonal(ones(k)))
+    Dkj3 = kron(ones(n), Diagonal(ones(k)))
 
-β_v = lm(Dkj1, residuals(linear_fit) .^ 2 / rw, rw)
-S[1,:] = sqrt.(coef(β_v)) # standard deviations
+    rw = reshape(τ,:) # reshape the matrix of posteriors into a vector
+    linear_fit = lm(Dkj1, DY1, wts = rw) # weighted least squares fit of Dkj1 and DY1 using rw weights
+
+    # recover coefficients from the linear fit 
+    β = coef(linear_fit)
+    A[1,:] = β[1:k] # intercepts
+
+    β_v = lm(Dkj1, residuals(linear_fit) .^ 2 / rw, rw)
+    S[1,:] = sqrt.(coef(β_v)) # standard deviations
+
+    ########### insert checks for the H and Q functions 
+
+    # Q function
+    Q1 = sum(tau_last * lpm_last) 
+    Q2 = sum(tau_last * lpm)
+
+    # H function 
+    H1 = -sum(tau_last * log.(tau_last))
+    H2 = -sum(tau_last * log.(tau))
+
+    error = abs(lik - lik_last) # error in the likelihood function 
+
+end # end the loop 
+
+end # end the function 
+
+
+########### simulate data 
+a_vector = 0.8 .* rand(3 * k) # vector of random numbers from uniform distribution 
+a_vector = 3 .* (1 .+ a_vector) 
+A_master = reshape(a_vector, 3, k)
+
+S_master = ones(3, k)
+
+pk_master = rand(Dirichlet(ones(k)), 1)
+
+y1 = zeros(n)
+y2 = zeros(n)
+y3 = zeros(n)
+K = zeros(n)
+
+
+
+
+
 
