@@ -19,6 +19,7 @@ using Random
 Random.seed!(2324) # set seed for reproducibility
 n = 1000 # number of individuals 
 k = 3 # number of latent groups 
+sd_scale = 1 # scale of the standard deviation used in simulating data 
 
 ########### define intermediate functions 
 
@@ -109,11 +110,28 @@ A_master = reshape(a_vector, 3, k)
 S_master = ones(3, k)
 
 pk_master = rand(Dirichlet(ones(k)), 1)
+pk_master_vector = vec(pk_master)
 
 y1 = zeros(n)
 y2 = zeros(n)
 y3 = zeros(n)
 K = zeros(n)
+
+k_types = collect(1:k)
+
+K = sample(k_types, Weights(pk_master_vector), 1000, replace = true) # wv= pk_master
+
+for i in 1:n
+    k_element = K[i]
+    y1[i] = A_master[1, k_element] + S_master[1, k_element] * rand(Normal(0, 1))*sd_scale
+    y2[i] = A_master[2, k_element] + S_master[2, k_element] * rand(Normal(0, 1))*sd_scale
+    y3[i] = A_master[3, k_element] + S_master[3, k_element] * rand(Normal(0, 1))*sd_scale
+end 
+
+
+
+
+
 
 
 
